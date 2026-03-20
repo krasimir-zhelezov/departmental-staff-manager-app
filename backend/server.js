@@ -131,6 +131,17 @@ app.get('/api/departments', async (req, res) => {
     }
 });
 
+app.get('/api/towns', async (req, res) => {
+    try {
+        // Fetching towns and ordering them alphabetically for a better UX
+        const [rows] = await pool.query('SELECT town_id, name FROM towns ORDER BY name ASC');
+        res.json(rows);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
 // 5. Create a new department (POST request example)
 app.post('/api/departments', async (req, res) => {
     try {
