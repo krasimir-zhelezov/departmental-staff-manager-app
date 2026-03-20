@@ -53,24 +53,58 @@ app.get('/api/employees', async (req, res) => {
 });
 
 app.post('/api/employees', async (req, res) => {
+    // Get a dedicated connection from the pool for the transaction
+    const connection = await pool.getConnection(); 
+    
     try {
-        const { first_name, last_name, job_title, department_id, salary } = req.body;
+        const { first_name, last_name, job_title, department_id, salary, address, town_id } = req.body;
         
         // Basic validation
-        if (!first_name || !last_name || !job_title || !department_id || !salary) {
+        if (!first_name || !last_name || !job_title || !department_id || !salary || !address || !town_id) {
             return res.status(400).json({ error: 'Missing required fields' });
         }
 
-        const query = `
-            INSERT INTO employees (first_name, last_name, job_title, department_id, salary) 
-            VALUES (?, ?, ?, ?, ?)
+        // Start the transaction
+        await connection.beginTransaction();
+
+        // 1. Insert the new address into the addresses table
+        // Note: Assuming your addresses table columns are named 'address_text' and 'town_id'. 
+        // Adjust 'address_text' if your actual column name is different!
+        const insertAddressQuery = `
+            INSERT INTO addresses (address_text, town_id) 
+            VALUES (?, ?)
         `;
+        const [addressResult] = await connection.query(insertAddressQuery, [address, town_id]);
         
-        const [result] = await pool.query(query, [first_name, last_name, job_title, department_id, salary]);
-        res.status(201).json({ message: 'Employee created', id: result.insertId });
+        // 2. Get the generated address_id
+        const newAddressId = addressResult.insertId;
+
+        // 3. Insert the employee using the new address_id
+        const insertEmployeeQuery = `
+            INSERT INTO employees (first_name, last_name, job_title, department_id, salary, address_id) 
+            VALUES (?, ?, ?, ?, ?, ?)
+        `;
+        const [employeeResult] = await connection.query(insertEmployeeQuery, [
+            first_name, 
+            last_name, 
+            job_title, 
+            department_id, 
+            salary, 
+            newAddressId
+        ]);
+
+        // Commit the transaction if both queries succeed
+        await connection.commit();
+
+        res.status(201).json({ message: 'Employee and Address created', id: employeeResult.insertId });
     } catch (error) {
+        // If anything fails, undo the address insertion
+        await connection.rollback();
         console.error(error);
         res.status(500).json({ error: 'Internal Server Error' });
+    } finally {
+        // Always release the connection back to the pool
+        connection.release();
     }
 });
 

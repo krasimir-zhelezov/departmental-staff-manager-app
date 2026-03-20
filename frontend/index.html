@@ -155,11 +155,12 @@
             width: 100%;
             height: 100%;
             background-color: rgba(0, 0, 0, 0.5);
+            overflow-y: auto;
         }
 
         .modal-content {
             background-color: white;
-            margin: 10% auto;
+            margin: 5% auto;
             padding: 20px;
             border-radius: 8px;
             width: 400px;
@@ -297,8 +298,19 @@
                         <label>Salary</label>
                         <input type="number" step="0.01" id="newSalary" required>
                     </div>
+                    <div class="form-group">
+                        <label>Town</label>
+                        <select id="newTown" required>
+                            <option value="">Select a Town...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Address</label>
+                        <input type="text" id="newAddress" required>
+                    </div>
                     <button type="submit" class="btn btn-success" style="width: 100%; margin-top: 10px;">Save
-                        Employee</button>
+                        Employee
+                    </button>
                 </form>
             </div>
         </div>
@@ -330,15 +342,23 @@
                 const response = await fetch('http://localhost:3000/api/towns');
                 towns = await response.json();
 
-                const townSelect = document.getElementById('fTown');
+                const townFilterSelect = document.getElementById('fTown');
+                const townFormSelect = document.getElementById('newTown'); // Target the new form dropdown
 
                 towns.forEach(town => {
-                    const option = document.createElement('option');
-                    // Since your applyFilters() matches against row.town (which is the name), 
-                    // the value needs to be the town name, not the town_id.
-                    option.value = town.name;
-                    option.textContent = town.name;
-                    townSelect.appendChild(option);
+                    // Populate the filter dropdown (using the name as the value)
+                    const filterOption = document.createElement('option');
+                    filterOption.value = town.name;
+                    filterOption.textContent = town.name;
+                    townFilterSelect.appendChild(filterOption);
+
+                    // Populate the new employee form dropdown
+                    // Note: Check what your backend expects here. I am using town.town_id as an assumption, 
+                    // falling back to town.id, then town.name. Adjust if your DB uses a different ID column.
+                    const formOption = document.createElement('option');
+                    formOption.value = town.town_id || town.id || town.name; 
+                    formOption.textContent = town.name;
+                    townFormSelect.appendChild(formOption);
                 });
             } catch (error) {
                 console.error("Failed to load towns", error);
@@ -512,7 +532,9 @@
                 last_name: document.getElementById('newLastName').value,
                 job_title: document.getElementById('newJobTitle').value,
                 department_id: document.getElementById('newDepartment').value,
-                salary: document.getElementById('newSalary').value
+                salary: document.getElementById('newSalary').value,
+                address: document.getElementById('newAddress').value,
+                town_id: document.getElementById('newTown').value 
             };
 
             try {
