@@ -1,0 +1,258 @@
+let rawData = [];
+let filteredData = [];
+let departments = [];
+let towns = [];
+let currentPage = 1;
+let rowsPerPage = 10;
+let sortCol = '';
+let sortAsc = true;
+
+// DOM Elements
+const modal = document.getElementById('addModal');
+const tbody = document.getElementById('tableBody');
+const fName = document.getElementById('fName');
+const fJob = document.getElementById('fJob');
+const fDept = document.getElementById('fDept');
+const fSalMin = document.getElementById('fSalMin');
+const fSalMax = document.getElementById('fSalMax');
+const fAddr = document.getElementById('fAddr');
+const fTown = document.getElementById('fTown');
+
+async function loadTowns() {
+    try {
+        const response = await fetch('http://localhost:3000/api/towns');
+        towns = await response.json();
+
+        const townFilterSelect = document.getElementById('fTown');
+        const townFormSelect = document.getElementById('newTown'); // Target the new form dropdown
+
+        towns.forEach(town => {
+            // Populate the filter dropdown (using the name as the value)
+            const filterOption = document.createElement('option');
+            filterOption.value = town.name;
+            filterOption.textContent = town.name;
+            townFilterSelect.appendChild(filterOption);
+
+            // Populate the new employee form dropdown
+            // Note: Check what your backend expects here. I am using town.town_id as an assumption, 
+            // falling back to town.id, then town.name. Adjust if your DB uses a different ID column.
+            const formOption = document.createElement('option');
+            formOption.value = town.town_id || town.id || town.name;
+            formOption.textContent = town.name;
+            townFormSelect.appendChild(formOption);
+        });
+    } catch (error) {
+        console.error("Failed to load towns", error);
+    }
+}
+
+async function loadEmployees() {
+    try {
+        const response = await fetch('http://localhost:3000/api/employees');
+        rawData = await response.json();
+        filteredData = [...rawData];
+        applyFilters();
+    } catch (error) {
+        console.error("Failed to load employees", error);
+        tbody.innerHTML = '<tr><td colspan="7" style="color: red; text-align: center;">Error loading data. Is the server running?</td></tr>';
+    }
+}
+
+async function loadDepartments() {
+    try {
+        const response = await fetch('http://localhost:3000/api/departments');
+        departments = await response.json();
+        const deptSelect = document.getElementById('newDepartment');
+        departments.forEach(dept => {
+            const option = document.createElement('option');
+            option.value = dept.department_id;
+            option.textContent = dept.name;
+            deptSelect.appendChild(option);
+        });
+    } catch (error) {
+        console.error("Failed to load departments", error);
+    }
+}
+
+// 2. Main Render Function
+function renderTable() {
+    // Apply Pagination bounds
+    const totalPages = Math.ceil(filteredData.length / rowsPerPage) || 1;
+    if (currentPage > totalPages) currentPage = totalPages;
+    if (currentPage < 1) currentPage = 1;
+
+    const startIdx = (currentPage - 1) * rowsPerPage;
+    const endIdx = startIdx + rowsPerPage;
+    const pageData = filteredData.slice(startIdx, endIdx);
+
+    tbody.innerHTML = '';
+
+    pageData.forEach((row, index) => {
+        const tr = document.createElement('tr');
+        const formattedSalary = Number(row.salary).toFixed(2);
+        tr.innerHTML = `
+                <td>${startIdx + index + 1}</td>
+                <td>${row.fullName}</td>
+                <td>${row.jobTitle}</td>
+                <td>${row.department}</td>
+                <td>$${formattedSalary}</td>
+                <td>${row.address}</td>
+                <td>${row.town}</td>
+                <td class="action-buttons">
+                    <button class="btn btn-edit" onclick="editRow(${row.id})">Edit</button>
+                    <button class="btn btn-danger" onclick="deleteRow(${row.id})">Delete</button>
+                </td>
+            `;
+        tbody.appendChild(tr);
+    });
+
+    // Update UI counters
+    document.getElementById('totalCount').innerText = rawData.length;
+    document.getElementById('displayCount').innerText = filteredData.length;
+    document.getElementById('pageInfo').innerText = `Page ${currentPage} / ${totalPages}`;
+}
+
+// 3. Filtering Logic
+function applyFilters() {
+    const sName = fName.value.toLowerCase();
+    const sJob = fJob.value.toLowerCase();
+    const sDept = fDept.value;
+    const sMin = parseFloat(fSalMin.value) || 0;
+    const sMax = parseFloat(fSalMax.value) || Infinity;
+    const sAddr = fAddr.value.toLowerCase();
+    const sTown = fTown.value;
+
+    filteredData = rawData.filter(row => {
+        return (
+            row.fullName.toLowerCase().includes(sName) &&
+            row.jobTitle.toLowerCase().includes(sJob) &&
+            (sDept === "" || row.department === sDept) &&
+            (row.salary >= sMin && row.salary <= sMax) &&
+            row.address.toLowerCase().includes(sAddr) &&
+            (sTown === "" || row.town === sTown)
+        );
+    });
+
+    currentPage = 1; // reset to first page on new filter
+    renderTable();
+}
+
+// Attach filter listeners
+[fName, fJob, fDept, fSalMin, fSalMax, fAddr, fTown].forEach(input => {
+    input.addEventListener('input', applyFilters);
+    input.addEventListener('change', applyFilters);
+});
+
+// 4. Sorting Logic
+document.querySelectorAll('.sortable').forEach(th => {
+    th.addEventListener('click', () => {
+        const col = th.getAttribute('data-col');
+        if (sortCol === col) {
+            sortAsc = !sortAsc; // Toggle direction
+        } else {
+            sortCol = col;
+            sortAsc = true;
+        }
+
+        filteredData.sort((a, b) => {
+            let valA = a[col];
+            let valB = b[col];
+
+            if (typeof valA === 'string') valA = valA.toLowerCase();
+            if (typeof valB === 'string') valB = valB.toLowerCase();
+
+            if (valA < valB) return sortAsc ? -1 : 1;
+            if (valA > valB) return sortAsc ? 1 : -1;
+            return 0;
+        });
+        renderTable();
+    });
+});
+
+// 5. Action Buttons (Clear, Excel, Add, Edit, Delete)
+document.getElementById('clearBtn').addEventListener('click', () => {
+    fName.value = ''; fJob.value = ''; fDept.value = '';
+    fSalMin.value = ''; fSalMax.value = ''; fAddr.value = ''; fTown.value = '';
+    sortCol = '';
+    filteredData = [...rawData];
+    currentPage = 1;
+    renderTable();
+});
+
+document.getElementById('excelBtn').addEventListener('click', () => {
+    // Simple CSV generation
+    const headers = ["ID", "Full Name", "Job Title", "Department", "Salary", "Address", "Town"];
+    let csvContent = headers.join(",") + "\n";
+
+    filteredData.forEach(row => {
+        // Quotes added to handle commas inside text
+        const r = [row.id, `"${row.fullName}"`, `"${row.jobTitle}"`, `"${row.department}"`, row.salary, `"${row.address}"`, `"${row.town}"`];
+        csvContent += r.join(",") + "\n";
+    });
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", "employee_export.csv");
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+});
+
+document.getElementById('addBtn').addEventListener('click', () => modal.style.display = 'block');
+document.getElementById('closeModal').addEventListener('click', () => modal.style.display = 'none');
+window.onclick = (event) => { if (event.target == modal) modal.style.display = "none"; }
+
+document.getElementById('addEmployeeForm').addEventListener('submit', async (e) => {
+    e.preventDefault(); // Prevent page refresh
+
+    const newEmployee = {
+        first_name: document.getElementById('newFirstName').value,
+        last_name: document.getElementById('newLastName').value,
+        job_title: document.getElementById('newJobTitle').value,
+        department_id: document.getElementById('newDepartment').value,
+        salary: document.getElementById('newSalary').value,
+        address: document.getElementById('newAddress').value,
+        town_id: document.getElementById('newTown').value
+    };
+
+    try {
+        const response = await fetch('http://localhost:3000/api/employees', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newEmployee)
+        });
+
+        if (response.ok) {
+            // Success! Close modal, clear form, and reload table
+            modal.style.display = 'none';
+            document.getElementById('addEmployeeForm').reset();
+            await loadEmployees(); // Refresh data from backend
+        } else {
+            const err = await response.json();
+            alert(`Error: ${err.error}`);
+        }
+    } catch (error) {
+        alert("Failed to connect to the server.");
+    }
+});
+
+window.editRow = (id) => alert("Edit employee ID: " + id);
+window.deleteRow = (id) => alert("Delete employee ID: " + id);
+
+// 6. Pagination Controls
+document.getElementById('prevPage').addEventListener('click', () => {
+    if (currentPage > 1) { currentPage--; renderTable(); }
+});
+
+document.getElementById('nextPage').addEventListener('click', () => {
+    const totalPages = Math.ceil(filteredData.length / rowsPerPage);
+    if (currentPage < totalPages) { currentPage++; renderTable(); }
+});
+
+loadDepartments();
+loadEmployees();
+loadTowns();
+renderTable();
