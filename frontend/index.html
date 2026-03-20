@@ -142,8 +142,13 @@
         }
 
         .action-buttons {
-            display: flex;
-            gap: 5px;
+            white-space: nowrap;
+            /* Prevents buttons from stacking vertically */
+        }
+
+        .action-buttons .btn-edit {
+            margin-right: 5px;
+            /* Replaces the flex gap */
         }
 
         .modal {
@@ -356,7 +361,7 @@
                     // Note: Check what your backend expects here. I am using town.town_id as an assumption, 
                     // falling back to town.id, then town.name. Adjust if your DB uses a different ID column.
                     const formOption = document.createElement('option');
-                    formOption.value = town.town_id || town.id || town.name; 
+                    formOption.value = town.town_id || town.id || town.name;
                     formOption.textContent = town.name;
                     townFormSelect.appendChild(formOption);
                 });
@@ -534,7 +539,7 @@
                 department_id: document.getElementById('newDepartment').value,
                 salary: document.getElementById('newSalary').value,
                 address: document.getElementById('newAddress').value,
-                town_id: document.getElementById('newTown').value 
+                town_id: document.getElementById('newTown').value
             };
 
             try {
