@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Employee Dashboard</title>
+    <style>
+        :root {
+            --primary: #4F46E5;
+            --danger: #EF4444;
+            --success: #10B981;
+            --gray-100: #F3F4F6;
+            --gray-300: #D1D5DB;
+            --gray-700: #374151;
+            --gray-800: #1F2937;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--gray-100);
+            color: var(--gray-800);
+            margin: 0;
+            padding: 20px;
+        }
+
+        .dashboard-container {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: opacity 0.2s;
+            color: white;
+        }
+
+        .btn:hover { opacity: 0.8; }
+        .btn-primary { background-color: var(--primary); }
+        .btn-success { background-color: var(--success); }
+        .btn-danger { background-color: var(--danger); padding: 4px 8px; font-size: 0.85em; }
+        .btn-edit { background-color: #F59E0B; padding: 4px 8px; font-size: 0.85em; }
+        .btn-outline { background-color: transparent; border: 1px solid var(--gray-300); color: var(--gray-700); }
+
+        .search-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            font-size: 0.9em;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--gray-300);
+        }
+
+        th {
+            background-color: var(--gray-100);
+            font-weight: 600;
+        }
+
+        .sortable {
+            cursor: pointer;
+            user-select: none;
+        }
+        
+        .sortable:hover {
+            background-color: #e5e7eb;
+        }
+
+        .filter-row input, .filter-row select {
+            width: 90%;
+            padding: 6px;
+            border: 1px solid var(--gray-300);
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+
+        .salary-range {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .salary-range input {
+            width: 80%;
+        }
+
+        .pagination-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 10px;
+            border-top: 1px solid var(--gray-300);
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 5px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="dashboard-container">
+    <div class="header-actions">
+        <h2>Employee Management</h2>
+        <div class="search-group">
+            <button class="btn btn-outline" id="clearBtn">Clear Filters</button>
+            <button class="btn btn-success" id="excelBtn">Export to Excel</button>
+            <button class="btn btn-primary" id="addBtn">+ Add New</button>
+        </div>
+    </div>
+
+    <table id="employeeTable">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th class="sortable" data-col="fullName">Full Name ↕</th>
+                <th class="sortable" data-col="jobTitle">Job Title ↕</th>
+                <th>Department</th>
+                <th class="sortable" data-col="salary">Salary ↕</th>
+                <th class="sortable" data-col="address">Address ↕</th>
+                <th>Town</th>
+                <th>Actions</th>
+            </tr>
+            <tr class="filter-row">
+                <td></td>
+                <td><input type="text" id="fName" placeholder="Search Name..."></td>
+                <td><input type="text" id="fJob" placeholder="Search Job..."></td>
+                <td>
+                    <select id="fDept">
+                        <option value="">All</option>
+                        <option value="Engineering">Engineering</option>
+                        <option value="Marketing">Marketing</option>
+                        <option value="Sales">Sales</option>
+                    </select>
+                </td>
+                <td>
+                    <div class="salary-range">
+                        <input type="number" id="fSalMin" placeholder="Min" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+                        <input type="number" id="fSalMax" placeholder="Max" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+                    </div>
+                </td>
+                <td><input type="text" id="fAddr" placeholder="Search Address..."></td>
+                <td>
+                    <select id="fTown">
+                        <option value="">All</option>
+                        <option value="Sofia">Sofia</option>
+                        <option value="Plovdiv">Plovdiv</option>
+                        <option value="Varna">Varna</option>
+                    </select>
+                </td>
+                <td></td>
+            </tr>
+        </thead>
+        <tbody id="tableBody">
+            </tbody>
+    </table>
+
+    <div class="pagination-container">
+        <div>
+            Showing <span id="displayCount">0</span> out of <span id="totalCount">0</span> records
+        </div>
+        <div class="search-group">
+            <button class="btn btn-outline" id="prevPage">Previous</button>
+            <span id="pageInfo">Page 1 / 1</span>
+            <button class="btn btn-outline" id="nextPage">Next</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 1. Mock Data generation (Simulating DB Join Output)
+    const rawData = Array.from({ length: 45 }, (_, i) => ({
+        id: i + 1,
+        fullName: `Employee ${String.fromCharCode(65 + (i % 26))} Name ${i}`,
+        jobTitle: ['Developer', 'Manager', 'Analyst', 'Designer', 'QA'][i % 5],
+        department: ['Engineering', 'Marketing', 'Sales'][i % 3],
+        salary: Math.floor(Math.random() * 5000) + 1500,
+        address: `${Math.floor(Math.random() * 100) + 1} Main St, Apt ${i}`,
+        town: ['Sofia', 'Plovdiv', 'Varna'][i % 3]
+    }));
+
+    // State variables
+    let filteredData = [...rawData];
+    let currentPage = 1;
+    let rowsPerPage = 10;
+    let sortCol = '';
+    let sortAsc = true;
+
+    // DOM Elements
+    const tbody = document.getElementById('tableBody');
+    const fName = document.getElementById('fName');
+    const fJob = document.getElementById('fJob');
+    const fDept = document.getElementById('fDept');
+    const fSalMin = document.getElementById('fSalMin');
+    const fSalMax = document.getElementById('fSalMax');
+    const fAddr = document.getElementById('fAddr');
+    const fTown = document.getElementById('fTown');
+
+    // 2. Main Render Function
+    function renderTable() {
+        // Apply Pagination bounds
+        const totalPages = Math.ceil(filteredData.length / rowsPerPage) || 1;
+        if (currentPage > totalPages) currentPage = totalPages;
+        if (currentPage < 1) currentPage = 1;
+
+        const startIdx = (currentPage - 1) * rowsPerPage;
+        const endIdx = startIdx + rowsPerPage;
+        const pageData = filteredData.slice(startIdx, endIdx);
+
+        tbody.innerHTML = '';
+        
+        pageData.forEach((row, index) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${startIdx + index + 1}</td>
+                <td>${row.fullName}</td>
+                <td>${row.jobTitle}</td>
+                <td>${row.department}</td>
+                <td>$${row.salary.toFixed(2)}</td>
+                <td>${row.address}</td>
+                <td>${row.town}</td>
+                <td class="action-buttons">
+                    <button class="btn btn-edit" onclick="editRow(${row.id})">Edit</button>
+                    <button class="btn btn-danger" onclick="deleteRow(${row.id})">Delete</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        // Update UI counters
+        document.getElementById('totalCount').innerText = rawData.length;
+        document.getElementById('displayCount').innerText = filteredData.length;
+        document.getElementById('pageInfo').innerText = `Page ${currentPage} / ${totalPages}`;
+    }
+
+    // 3. Filtering Logic
+    function applyFilters() {
+        const sName = fName.value.toLowerCase();
+        const sJob = fJob.value.toLowerCase();
+        const sDept = fDept.value;
+        const sMin = parseFloat(fSalMin.value) || 0;
+        const sMax = parseFloat(fSalMax.value) || Infinity;
+        const sAddr = fAddr.value.toLowerCase();
+        const sTown = fTown.value;
+
+        filteredData = rawData.filter(row => {
+            return (
+                row.fullName.toLowerCase().includes(sName) &&
+                row.jobTitle.toLowerCase().includes(sJob) &&
+                (sDept === "" || row.department === sDept) &&
+                (row.salary >= sMin && row.salary <= sMax) &&
+                row.address.toLowerCase().includes(sAddr) &&
+                (sTown === "" || row.town === sTown)
+            );
+        });
+
+        currentPage = 1; // reset to first page on new filter
+        renderTable();
+    }
+
+    // Attach filter listeners
+    [fName, fJob, fDept, fSalMin, fSalMax, fAddr, fTown].forEach(input => {
+        input.addEventListener('input', applyFilters);
+        input.addEventListener('change', applyFilters);
+    });
+
+    // 4. Sorting Logic
+    document.querySelectorAll('.sortable').forEach(th => {
+        th.addEventListener('click', () => {
+            const col = th.getAttribute('data-col');
+            if (sortCol === col) {
+                sortAsc = !sortAsc; // Toggle direction
+            } else {
+                sortCol = col;
+                sortAsc = true;
+            }
+
+            filteredData.sort((a, b) => {
+                let valA = a[col];
+                let valB = b[col];
+                
+                if (typeof valA === 'string') valA = valA.toLowerCase();
+                if (typeof valB === 'string') valB = valB.toLowerCase();
+
+                if (valA < valB) return sortAsc ? -1 : 1;
+                if (valA > valB) return sortAsc ? 1 : -1;
+                return 0;
+            });
+            renderTable();
+        });
+    });
+
+    // 5. Action Buttons (Clear, Excel, Add, Edit, Delete)
+    document.getElementById('clearBtn').addEventListener('click', () => {
+        fName.value = ''; fJob.value = ''; fDept.value = ''; 
+        fSalMin.value = ''; fSalMax.value = ''; fAddr.value = ''; fTown.value = '';
+        sortCol = ''; 
+        filteredData = [...rawData];
+        currentPage = 1;
+        renderTable();
+    });
+
+    document.getElementById('excelBtn').addEventListener('click', () => {
+        // Simple CSV generation
+        const headers = ["ID", "Full Name", "Job Title", "Department", "Salary", "Address", "Town"];
+        let csvContent = headers.join(",") + "\n";
+        
+        filteredData.forEach(row => {
+            // Quotes added to handle commas inside text
+            const r = [row.id, `"${row.fullName}"`, `"${row.jobTitle}"`, `"${row.department}"`, row.salary, `"${row.address}"`, `"${row.town}"`];
+            csvContent += r.join(",") + "\n";
+        });
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        link.setAttribute("download", "employee_export.csv");
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    });
+
+    document.getElementById('addBtn').addEventListener('click', () => alert("Add logic goes here!"));
+    
+    window.editRow = (id) => alert("Edit employee ID: " + id);
+    window.deleteRow = (id) => alert("Delete employee ID: " + id);
+
+    // 6. Pagination Controls
+    document.getElementById('prevPage').addEventListener('click', () => {
+        if (currentPage > 1) { currentPage--; renderTable(); }
+    });
+    
+    document.getElementById('nextPage').addEventListener('click', () => {
+        const totalPages = Math.ceil(filteredData.length / rowsPerPage);
+        if (currentPage < totalPages) { currentPage++; renderTable(); }
+    });
+
+    // Initial render
+    renderTable();
+</script>
+
+</body>
+</html>
